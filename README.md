@@ -1,6 +1,6 @@
 # Muscle Atlas
 
-A rotatable 3D model of the human bones and muscles for studying BIOL 232 (Human Anatomy and Physiology I) at Eastern Washington University. Tap any bone or muscle to see what it is, its origin, insertion and action, and which bones and muscles it connects to. Quiz mode tests names, locations, origins, insertions, actions and bone purposes, using spaced repetition: missed cards come back a few questions later, and correct ones come back after longer and longer gaps (1 day, 3 days, then about 2.5 times longer each time). Progress is saved in the browser (localStorage) on that device.
+A rotatable 3D model of the human bones and muscles for studying BIOL 232 (Human Anatomy and Physiology I) at Eastern Washington University. Tap any bone or muscle to see what it is, its origin, insertion and action, and which bones and muscles it connects to. Quiz mode tests names, spelling, locations, origins, insertions, actions and bone purposes, using spaced repetition: missed cards come back a few questions later, and correct ones come back after longer and longer gaps (1 day, 3 days, then about 2.5 times longer each time). Progress is saved in the browser (localStorage) on that device.
 
 To run model click link: 
  https://krbmab0907.github.io/232-Bio-A-P-Muscles-and-Bones-interactive-model-/

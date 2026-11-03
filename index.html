@@ -113,6 +113,13 @@ select{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background
 .btn.danger{border-color:var(--bad);color:var(--bad)}
 .nextline{color:var(--ink-2)}
 .kbd{font:11px var(--font-mono);color:var(--ink-2);margin-top:8px}
+.spell{display:flex;gap:8px;flex-wrap:wrap}
+.spell input{flex:1 1 200px;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:16px var(--font-body)}
+.spell input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.spell .primary{margin-top:0}
+.spellans{font-size:16px;letter-spacing:.02em}
+.spellans mark{background:color-mix(in srgb,var(--bad) 24%,transparent);color:inherit;border-radius:2px;padding:0 1px;text-decoration:underline;text-decoration-color:var(--bad)}
+.typed{font-family:var(--font-mono);font-size:13px}
 .credit{font-size:12px;color:var(--ink-2)}
 .credit a{color:var(--ink-2)}
 </style>
@@ -387,7 +394,7 @@ $('spin').onclick=()=>{controls.autoRotate=!controls.autoRotate;controls.autoRot
 
 // ---------- quiz with spaced repetition ----------
 let mode='study',quiz=null,quizMarks=null,score={r:0,t:0},practice=false,relearn=[],lastId=null,confirmReset=false;
-const TYPES={mus:[['mix','Mixed'],['name','Name the muscle'],['find','Find it on the model'],['o','Origin'],['i','Insertion'],['a','Action']],bone:[['mix','Mixed'],['name','Name the bone'],['find','Find it on the model'],['p','Purpose']]};
+const TYPES={mus:[['mix','Mixed'],['name','Name the muscle'],['find','Find it on the model'],['spell','Spell the name'],['o','Origin'],['i','Insertion'],['a','Action']],bone:[['mix','Mixed'],['name','Name the bone'],['find','Find it on the model'],['spell','Spell the name'],['p','Purpose']]};
 const qType=$('qType'),qTopic=$('qTopic'),qDeck=$('qDeck'),qBody=$('qBody'),qBar=$('srsBar'),prog=$('progress');
 function fillTypes(){qType.innerHTML=TYPES[qTopic.value].map(([v,t])=>`<option value="${v}">${t}</option>`).join('')}
 const pickR=a=>a[Math.floor(Math.random()*a.length)],shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
@@ -422,7 +429,7 @@ function deckGroups(topic){const all=qDeck.value==='all';return pool(topic).filt
 function deckCards(){const topic=qTopic.value,ts=qType.value==='mix'?TYPES[topic].slice(1).map(x=>x[0]):[qType.value],out=[];
   for(const g of deckGroups(topic))for(const t of ts)out.push({id:topic+'|'+g.parent+'|'+t,g,type:t});return out}
 // New cards: learn to recognise a structure first (name, find), then its details a few structures later.
-function newKey(c,gi){const base=gi.get(c.g.parent)||0;if(c.type==='name')return base;if(c.type==='find')return base+.1;
+function newKey(c,gi){const base=gi.get(c.g.parent)||0;if(c.type==='name')return base;if(c.type==='find')return base+.1;if(c.type==='spell')return base+3;
   return base+6+TYPES[qTopic.value].findIndex(x=>x[0]===c.type)*.1}
 function nextCard(){
   rollDay();
@@ -498,6 +505,44 @@ function caughtUp(){
   const mo=$('more');if(mo)mo.onclick=()=>{const t=qTopic.value;store.extraBy[t]=(store.extraBy[t]||0)+10;save();newQ()};
   const pr=$('prac');if(pr)pr.onclick=()=>{practice=true;newQ()};
 }
+// ---------- spelling questions ----------
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Capitals, hyphens, punctuation and extra spaces don't count; letters do.
+const norm=t=>(t||'').normalize('NFKD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[-_/]/g,' ').replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim().replace(/^the /,'');
+const ordSfx=n=>n+(n%10===1&&n!==11?'st':n%10===2&&n!==12?'nd':n%10===3&&n!==13?'rd':'th');
+// Other names textbooks use for the same structure.
+const ALIAS={'hip bone':['os coxae','coxal bone','innominate bone'],'atlas':['c1','c1 vertebra'],'axis':['c2','c2 vertebra'],
+  'body of sternum':['sternal body','body of the sternum','sternum body'],'manubrium':['manubrium of sternum','manubrium of the sternum'],'xiphoid process':['xiphoid'],
+  'triquetral':['triquetrum'],'navicular bone of foot':['navicular','navicular bone'],'zygomatic bone':['zygoma'],'ethmoid':['ethmoid bone'],
+  'tensor fasciae latae':['tensor fascia latae'],'flexor accessorius':['quadratus plantae'],'gemellus superior':['superior gemellus'],'gemellus inferior':['inferior gemellus'],
+  'rotatores':['rotatores muscles','rotator'],'interspinales':['interspinalis'],'intertransversarii':['intertransversarius'],'levatores costarum':['levator costae'],
+  'psoas major':['psoas'],'external intercostals':['external intercostal'],'internal intercostals':['internal intercostal'],'innermost intercostals':['innermost intercostal'],
+  'lumbricals of hand':['lumbricals','lumbrical'],'lumbricals of foot':['lumbricals','lumbrical'],'palmar interossei of hand':['palmar interossei','palmar interosseous'],
+  'dorsal interossei of hand':['dorsal interossei','dorsal interosseous'],'dorsal interossei of foot':['dorsal interossei','dorsal interosseous'],'plantar interossei of foot':['plantar interossei','plantar interosseous']};
+function accepted(g){
+  const p=g.parent,out=new Set();
+  const add=t=>{t=norm(t);if(!t)return;for(const v of [t,t.replace(/ bone$/,''),t.replace(/ of (hand|foot)$/,''),t.replace(/^fibularis /,'peroneus '),t.replace(/ muscles?$/,'')])if(v)out.add(v)};
+  add(p);add(gName(g).replace(/ \(.*\)$/,''));(ALIAS[p]||[]).forEach(add);
+  let m=p.match(/^(\w+) (cervical|thoracic|lumbar) vertebra$/);if(m){const k=ORD[m[1]],code=m[2][0]+k;add(code);add(code+' vertebra');add(ordSfx(k)+' '+m[2]+' vertebra')}
+  m=p.match(/^(\w+) rib$/);if(m){const k=ORD[m[1]];add('rib '+k);add(ordSfx(k)+' rib')}
+  m=p.match(/^(\w+) (metacarpal|metatarsal) bone$/);if(m){const k=ORD[m[1]];add(m[2]+' '+k);add(m[1]+' '+m[2]);add(ordSfx(k)+' '+m[2])}
+  return out}
+function lev(a,b){const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let prev=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=t}}return d[b.length]}
+// Marks the letters of the correct spelling that the typed answer missed or got wrong.
+function markDiff(c,t){const A=c.toLowerCase(),B=norm(t),n=A.length,m=B.length,L=[...Array(n+1)].map(()=>new Int16Array(m+1));
+  for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)L[i][j]=A[i]===B[j]?L[i+1][j+1]+1:Math.max(L[i+1][j],L[i][j+1]);
+  let i=0,j=0,o='';while(i<n){if(j<m&&A[i]===B[j]){o+=esc(c[i]);i++;j++}else if(j<m&&L[i][j+1]>=L[i+1][j])j++;else{o+=c[i]===' '?' ':`<mark>${esc(c[i])}</mark>`;i++}}return o}
+function checkSpell(v){
+  if(!quiz||quiz.done||quiz.type!=='spell')return;const inp=$('spellIn');
+  if(v!==null&&!norm(v)){inp.focus();return}
+  const t=v===null?'':norm(v),ok=v!==null&&quiz.acc.has(t);
+  inp.disabled=true;$('spellGo').disabled=true;$('giveUp').disabled=true;
+  if(ok)quiz.extra=`<div class="fb">You typed <span class="typed">${esc(v.trim())}</span>.</div>`;
+  else if(v===null)quiz.extra=`<div class="fb">Answer: <b class="spellans">${esc(quiz.canon)}</b></div>`;
+  else{const d=Math.min(...[...quiz.acc].map(a=>lev(t,a)));
+    quiz.extra=`<div class="fb">${d<=2?'Close, but the spelling is off. ':''}You typed <span class="typed">${esc(v.trim())}</span>.<br>Correct spelling: <b class="spellans">${markDiff(quiz.canon,v)}</b></div>`}
+  finish(ok)}
+
 function newQ(){
   confirmReset=false;
   const topic=qTopic.value,c=practice?practiceCard():nextCard();
@@ -509,6 +554,16 @@ function newQ(){
   if(type==='find'){quizDim=null;select([]);applyVis();home();
     qBody.innerHTML=`<p class="prompt">${tag}<br>Tap the <em>${gName(g)}</em> on the model.</p><p class="note">Either side counts. Rotate the model if you need to; deep muscles may need "See-through muscles" or "Hide selected".</p><div id="fb"></div>`;renderSRS();return}
   quizDim=new Set(target);applyVis();select(target);focus(target);
+  if(type==='spell'){
+    quiz.acc=accepted(g);quiz.canon=gName(g).replace(/ \(.*\)$/,'');quiz.right=quiz.canon;
+    const leave=topic==='bone'?', and you can leave off the word "bone"':/ of (hand|foot)$/.test(g.parent)?', and you can leave off "of hand" or "of foot"':'';
+    qBody.innerHTML=`<p class="prompt">${tag}<br>Spell the name of the highlighted ${topic==='mus'?'muscle':'bone'}.</p>
+      <form class="spell" id="spellForm" autocomplete="off"><input id="spellIn" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="Type the name"><button class="primary" id="spellGo" type="submit">Check</button></form>
+      <div class="row"><button class="linkbtn" id="giveUp" type="button">I don't know, show the answer</button></div>
+      <p class="kbd">Spelling counts. Capitals and hyphens don't matter${leave}.</p><div id="fb"></div>`;
+    $('spellForm').onsubmit=e=>{e.preventDefault();checkSpell($('spellIn').value)};$('giveUp').onclick=()=>checkSpell(null);
+    setTimeout(()=>{const i=$('spellIn');if(i)try{i.focus({preventScroll:true})}catch(e){}},60);
+    renderSRS();return}
   const f=topic==='mus'?MF[g.parent]:bfact(g.parent);
   let right,q,field;
   if(type==='name'){right=gName(g);q=`Which ${topic==='mus'?'muscle':'bone'} is highlighted?`}
@@ -524,7 +579,7 @@ function newQ(){
 }
 function explain(g){const f=g.cat==='mus'?MF[g.parent]:bfact(g.parent);return g.cat==='mus'?`<div class="fb"><b>${gName(g)}</b> · Origin: ${f[1]}. Insertion: ${f[2]}. Action: ${f[3]}.</div>`:`<div class="fb"><b>${gName(g)}</b> · ${f[2]}. ${f[3]}.</div>`}
 function finish(ok){score.t++;if(ok)score.r++;$('score').textContent=`${score.r} of ${score.t} right this session`;quiz.done=true;const msg=grade(quiz.card,ok);
-  $('fb').innerHTML=`<div class="fb"><b class="${ok?'ok':'no'}">${ok?'Correct.':'Not quite.'}</b> <span class="nextline">${msg}</span></div>`+explain(quiz.g)+`<button class="primary" id="next">Next question</button>`;$('next').onclick=newQ;$('next').focus();renderSRS()}
+  $('fb').innerHTML=`<div class="fb"><b class="${ok?'ok':'no'}">${ok?'Correct.':'Not quite.'}</b> <span class="nextline">${msg}</span></div>`+(quiz.extra||'')+explain(quiz.g)+`<button class="primary" id="next">Next question</button>`;$('next').onclick=newQ;$('next').focus();renderSRS()}
 function answer(b){if(!quiz||quiz.done)return;qBody.querySelectorAll('.choices button').forEach(x=>{x.disabled=true;if(x.textContent===quiz.right)x.classList.add('right')});const ok=b.textContent===quiz.right;if(!ok)b.classList.add('wrong');finish(ok)}
 function quizClick(m){if(!quiz||quiz.type!=='find'||quiz.done)return;const ok=quiz.g.meshes.includes(m);
   quizMarks=new Map();if(!ok)byKey[m.userData.key].forEach(x=>quizMarks.set(x,0xb03a3a));quiz.g.meshes.forEach(x=>quizMarks.set(x,0x2f9d5f));paint();focus(quiz.g.meshes);finish(ok)}
