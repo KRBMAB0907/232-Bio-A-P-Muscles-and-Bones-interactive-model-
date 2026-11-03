@@ -166,7 +166,7 @@ select{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background
 <script>
 (async function(){
 const $=id=>document.getElementById(id);
-const MF=window.MFACTS, BF=window.BFACTS, BK=window.BKEYS;
+const MF=window.MFACTS, BF=window.BFACTS;
 // ---------- names ----------
 const ORD={first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,ninth:9,tenth:10,eleventh:11,twelfth:12};
 const sideOf=n=>/\bright\b/.test(n)?'right':/\bleft\b/.test(n)?'left':'';
@@ -302,20 +302,20 @@ function label(m){const u=m.userData;const n=u.cat==='mus'?cap(u.parent):prettyB
 const info=$('info');
 function idle(){info.innerHTML='<p class="empty">Tap any bone or muscle on the model, or pick one from the list.</p>'}
 const bfact=b=>BF.find(f=>f[0].test(b));
-function bonesForText(txt){const out=[];for(const [bre,kre] of BK)if(kre.test(txt))out.push(bre);return out}
-function findBone(bre,side){const c=meshes.filter(m=>m.userData.cat==='bone'&&bre.test(m.userData.base));return c.find(m=>m.userData.side===side)||c.find(m=>!m.userData.side)||c[0]}
-function musclesForBone(base){const k=BK.find(x=>x[0].test(base));if(!k)return{o:[],i:[]};const o=[],i=[];
-  for(const n in MF){if(!groups['mus|'+n])continue;if(k[1].test(MF[n][1]))o.push(n);if(k[1].test(MF[n][2]))i.push(n)}return{o,i}}
+const ATTX={};for(const n in window.MATT){const [o,i]=window.MATT[n];ATTX[n]={o:o.split(' ').filter(Boolean),i:i.split(' ').filter(Boolean)}}
+const EXP={};const expand=t=>EXP[t]||(EXP[t]=window.ATT.expand(t));
+function boneMeshesFor(tok,side){const names=expand(tok);return meshes.filter(m=>m.userData.cat==='bone'&&names.includes(m.userData.base)&&(!side||!m.userData.side||m.userData.side===side))}
+function musclesForBone(base){const o=[],i=[];for(const n in ATTX){if(!groups['mus|'+n])continue;if(ATTX[n].o.some(t=>expand(t).includes(base)))o.push(n);if(ATTX[n].i.some(t=>expand(t).includes(base)))i.push(n)}return{o,i}}
 function showPart(m,fly){
   const u=m.userData;
   if(u.cat==='mus'){
     const list=byKey[u.key];select(list);const f=MF[u.parent];
-    const bones=f?[...new Set([...bonesForText(f[1]).map(b=>['origin',b]),...bonesForText(f[2]).map(b=>['insertion',b])].map(x=>JSON.stringify([x[0],x[1].source])))].map(s=>JSON.parse(s)):[];
-    const chips=bones.map(([r,src])=>{const bm=findBone(new RegExp(src),u.side);return bm?`<button class="chip" data-mesh="${meshes.indexOf(bm)}">${prettyBone(bm.userData.base).replace(/ \(.*/,'')}<small>${r}</small></button>`:''}).join('');
+    const at=ATTX[u.parent]||{o:[],i:[]};
+    const chips=[...at.o.map(t=>[t,'origin']),...at.i.map(t=>[t,'insertion'])].map(([t,r])=>`<button class="chip" data-tok="${t}" data-side="${u.side}">${window.ATT.label(t)}<small>${r}</small></button>`).join('');
     info.innerHTML=`<div class="eyebrow">${f?f[0]:'Muscle'}${u.side?' · '+u.side+' side':''}</div><h2>${cap(u.parent)}</h2>
       ${u.base!==u.parent?`<p class="part">Part tapped: ${u.base}</p>`:'<p class="part"></p>'}
       ${f?`<dl><div><dt>Origin</dt><dd>${f[1]}</dd></div><div><dt>Insertion</dt><dd>${f[2]}</dd></div><div><dt>Action</dt><dd>${f[3]}</dd></div>
-      ${chips?`<div><dt>Attaches to</dt><dd class="chips">${chips}</dd></div>`:''}</dl>`:'<p class="empty">Origin and insertion for this small muscle are not in this guide.</p>'}
+      ${chips?`<div><dt>Bones it attaches to</dt><dd class="chips">${chips}</dd></div>`:'<div><dt>Bones it attaches to</dt><dd>None: this muscle attaches to skin, fascia or other muscles.</dd></div>'}</dl>`:'<p class="empty">Origin and insertion for this small muscle are not in this guide.</p>'}
       <p class="note">Tip: use "Hide selected" to peel this muscle away and see what lies underneath.</p>`;
   }else{
     select([m]);const f=bfact(u.base)||[0,u.cat==='cart'?'Cartilage':u.cat==='tend'?'Tendon or ligament':'Bone','',''];
@@ -332,7 +332,8 @@ function showPart(m,fly){
   if(fly)focus(sel);renderList();
 }
 info.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.mesh){const m=meshes[+b.dataset.mesh];if(!layerOn.bone){layerOn.bone=true;$('L-bone').checked=true}hidden.delete(m);applyVis();showPart(m,true)}
+  if(b.dataset.tok){const list=boneMeshesFor(b.dataset.tok,b.dataset.side);if(!list.length)return;if(!layerOn.bone){layerOn.bone=true;$('L-bone').checked=true}list.forEach(m=>hidden.delete(m));applyVis();
+    if(list.length===1)showPart(list[0],true);else{select(list);focus(list)}}
   if(b.dataset.mus){const g=groups['mus|'+b.dataset.mus];if(!g)return;const m=g.meshes.find(x=>x.userData.side===b.dataset.side)||g.meshes[0];if(!layerOn.mus){layerOn.mus=true;$('L-mus').checked=true}g.meshes.forEach(x=>hidden.delete(x));applyVis();showPart(m,true)}});
 
 // ---------- list ----------

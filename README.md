@@ -2,9 +2,6 @@
 
 A rotatable 3D model of the human bones and muscles for studying BIOL 232 (Human Anatomy and Physiology I) at Eastern Washington University. Tap any bone or muscle to see what it is, its origin, insertion and action, and which bones and muscles it connects to. Quiz mode tests names, locations, origins, insertions, actions and bone purposes.
 
-To just have  a link to have for the model:
-https://krbmab0907.github.io/232-Bio-A-P-Muscles-and-Bones-interactive-model-/
-
 ## Run it in VS Code
 
 The page loads its 3D data with `fetch`, so it has to be opened through a local web server. Double-clicking `index.html` will not work.
@@ -44,7 +41,7 @@ Then open http://localhost:8000 (or the address `serve` prints) in your browser.
 | --- | --- |
 | `index.html` | The 3D atlas (viewer, study panel, quiz) |
 | `flat.html` | The simpler 2D study plates |
-| `data/facts.js` | Study facts: origin, insertion and action for each muscle; location, purpose and length for each bone. Edit this to match her textbook. |
+| `data/facts.js` | Study facts: origin, insertion and action for each muscle (MFACTS), the exact bones each muscle starts and ends on (MATT), and location, purpose and length for each bone (BFACTS). Edit this to match her textbook. |
 | `data/manifest.json` | List of every 3D part and where its shape is stored |
 | `data/*.bin` | Compressed 3D shapes for bones, muscles, cartilage and tendons |
 | `vendor/` | three.js r147 (3D library), so the page works offline |
