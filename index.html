@@ -93,6 +93,26 @@ select{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background
 .fb{margin-top:12px;font-size:14px}
 .fb b.ok{color:var(--good)} .fb b.no{color:var(--bad)}
 .primary{margin-top:12px;border:0;background:var(--accent);color:var(--paper);font:600 14px var(--font-body);padding:10px 16px;border-radius:8px;cursor:pointer}
+.srsbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px}
+.tag{font:500 11px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--ink-2);background:var(--bg);white-space:nowrap}
+.tag.new{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.tag.again{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,var(--line))}
+.tag.due{color:var(--ink)}
+.linkbtn{border:0;background:none;color:var(--accent);font:600 12px var(--font-body);cursor:pointer;padding:3px 4px}
+.pbar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--bg);border:1px solid var(--line);margin:10px 0}
+.pbar i{display:block;height:100%}
+.pbar .m{background:var(--accent)}
+.pbar .l{background:color-mix(in srgb,var(--accent) 38%,var(--paper))}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;font-variant-numeric:tabular-nums}
+.stat b{display:block;font-family:var(--font-display);font-stretch:90%;font-weight:750;font-size:24px;line-height:1.1}
+.stat span{font-size:12px;color:var(--ink-2)}
+.stat i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}
+.sub2{font:500 11px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin:14px 0 2px}
+.setrow{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:13px;color:var(--ink-2);flex-wrap:wrap}
+.confirm{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px;font-size:14px}
+.btn.danger{border-color:var(--bad);color:var(--bad)}
+.nextline{color:var(--ink-2)}
+.kbd{font:11px var(--font-mono);color:var(--ink-2);margin-top:8px}
 .credit{font-size:12px;color:var(--ink-2)}
 .credit a{color:var(--ink-2)}
 </style>
@@ -148,11 +168,14 @@ select{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background
             <div class="qsel">
               <select id="qTopic" aria-label="Quiz topic"><option value="mus">Muscles</option><option value="bone">Bones</option></select>
               <select id="qType" aria-label="Question type"></select>
+              <select id="qDeck" aria-label="Which set"><option value="core">Core list (BIOL 232)</option><option value="all">Everything in the model</option></select>
             </div>
-            <span class="score" id="score">0 / 0</span>
+            <span class="score" id="score">0 of 0 right this session</span>
           </div>
+          <div class="srsbar" id="srsBar"></div>
           <div id="qBody"></div>
         </div>
+        <div class="card" id="progress" style="margin-top:12px"></div>
       </div>
 
       <p class="credit">3D anatomy: <a href="https://lifesciencedb.jp/bp3d/" target="_blank" rel="noopener">BodyParts3D</a>, © The Database Center for Life Science, licensed <a href="https://creativecommons.org/licenses/by-sa/2.1/jp/deed.en" target="_blank" rel="noopener">CC BY-SA 2.1 Japan</a>. Models simplified for the web. The dataset has no ear ossicles or coccyx. Lengths are rough adult averages.</p>
@@ -362,47 +385,156 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>flyTo(controls
 $('reset').onclick=home;
 $('spin').onclick=()=>{controls.autoRotate=!controls.autoRotate;controls.autoRotateSpeed=1.4;$('spin').setAttribute('aria-pressed',controls.autoRotate)};
 
-// ---------- quiz ----------
-let mode='study',quiz=null,quizMarks=null,score={r:0,t:0};
+// ---------- quiz with spaced repetition ----------
+let mode='study',quiz=null,quizMarks=null,score={r:0,t:0},practice=false,relearn=[],lastId=null,confirmReset=false;
 const TYPES={mus:[['mix','Mixed'],['name','Name the muscle'],['find','Find it on the model'],['o','Origin'],['i','Insertion'],['a','Action']],bone:[['mix','Mixed'],['name','Name the bone'],['find','Find it on the model'],['p','Purpose']]};
-const qType=$('qType'),qTopic=$('qTopic'),qBody=$('qBody');
+const qType=$('qType'),qTopic=$('qTopic'),qDeck=$('qDeck'),qBody=$('qBody'),qBar=$('srsBar'),prog=$('progress');
 function fillTypes(){qType.innerHTML=TYPES[qTopic.value].map(([v,t])=>`<option value="${v}">${t}</option>`).join('')}
-qTopic.onchange=()=>{fillTypes();newQ()};qType.onchange=newQ;
 const pickR=a=>a[Math.floor(Math.random()*a.length)],shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 function pool(topic){return Object.values(groups).filter(g=>topic==='mus'?(g.cat==='mus'&&MF[g.parent]):(g.cat==='bone'&&bfact(g.parent)&&!/tooth/.test(g.parent)))}
 const gName=g=>g.cat==='mus'?cap(g.parent):prettyBone(g.parent);
+
+// Progress is kept in this browser only (one record per card: topic | structure | question type).
+const SRS_KEY='muscleAtlas.srs.v1',DAY=86400000;
+let store={cards:{},day:'',newBy:{},extraBy:{},settings:{newPerDay:20,deck:'core'}},canSave=true;
+try{const raw=localStorage.getItem(SRS_KEY);if(raw){const o=JSON.parse(raw);store=Object.assign(store,o);store.cards=store.cards||{};store.newBy=store.newBy||{};store.extraBy=store.extraBy||{};store.settings=Object.assign({newPerDay:20,deck:'core'},o.settings||{})}}catch(e){canSave=false}
+try{localStorage.setItem(SRS_KEY+'.t','1');localStorage.removeItem(SRS_KEY+'.t')}catch(e){canSave=false}
+function save(){if(!canSave)return;try{localStorage.setItem(SRS_KEY,JSON.stringify(store))}catch(e){canSave=false}}
+const dayStart=()=>{const d=new Date();d.setHours(0,0,0,0);return d.getTime()};
+const dayKey=()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()};
+function rollDay(){const k=dayKey();if(store.day!==k){store.day=k;store.newBy={};store.extraBy={};save()}}
+rollDay();
+// New cards per day are counted separately for muscles and for bones.
+const newDone=()=>store.newBy[qTopic.value]||0,newLimit=()=>store.settings.newPerDay+(store.extraBy[qTopic.value]||0);
+qDeck.value=store.settings.deck==='all'?'all':'core';
+
+// The core list: the muscles in the BIOL 232 study guide, and the named bones (not every rib, vertebra, digit bone or tooth).
+const CORE_M=new Set(['frontalis','temporalis','orbicularis oculi','zygomaticus major','masseter','orbicularis oris','buccinator','sternocleidomastoid','platysma','splenius capitis',
+ 'trapezius','latissimus dorsi','rhomboid major','rhomboid minor','levator scapulae','iliocostalis lumborum','longissimus thoracis','spinalis thoracis','quadratus lumborum',
+ 'pectoralis major','pectoralis minor','serratus anterior','external intercostals','internal intercostals','diaphragm','rectus abdominis','external oblique','internal oblique','transversus abdominis',
+ 'deltoid','supraspinatus','infraspinatus','teres minor','subscapularis','teres major','coracobrachialis','biceps brachii','brachialis','brachioradialis','triceps brachii',
+ 'pronator teres','supinator','flexor carpi radialis','flexor carpi ulnaris','palmaris longus','flexor digitorum superficialis','extensor carpi radialis longus','extensor carpi ulnaris','extensor digitorum',
+ 'iliacus','psoas major','gluteus maximus','gluteus medius','gluteus minimus','tensor fasciae latae','piriformis','adductor longus','adductor brevis','adductor magnus','gracilis',
+ 'rectus femoris','vastus lateralis','vastus medialis','vastus intermedius','sartorius','biceps femoris','semitendinosus','semimembranosus',
+ 'tibialis anterior','extensor digitorum longus','fibularis longus','fibularis brevis','gastrocnemius','soleus','tibialis posterior']);
+const coreBone=p=>!/tooth|phalanx|\brib$|metacarpal|metatarsal|vertebra|sesamoid/.test(p);
+function deckGroups(topic){const all=qDeck.value==='all';return pool(topic).filter(g=>all||(topic==='mus'?CORE_M.has(g.parent):coreBone(g.parent)))}
+function deckCards(){const topic=qTopic.value,ts=qType.value==='mix'?TYPES[topic].slice(1).map(x=>x[0]):[qType.value],out=[];
+  for(const g of deckGroups(topic))for(const t of ts)out.push({id:topic+'|'+g.parent+'|'+t,g,type:t});return out}
+// New cards: learn to recognise a structure first (name, find), then its details a few structures later.
+function newKey(c,gi){const base=gi.get(c.g.parent)||0;if(c.type==='name')return base;if(c.type==='find')return base+.1;
+  return base+6+TYPES[qTopic.value].findIndex(x=>x[0]===c.type)*.1}
+function nextCard(){
+  rollDay();
+  const cards=deckCards(),byId=new Map(cards.map(c=>[c.id,c])),now=Date.now();
+  const rl=relearn.filter(r=>byId.has(r.id));
+  const ready=rl.find(r=>r.wait<=0);
+  if(ready){relearn=relearn.filter(x=>x!==ready);return Object.assign({kind:'again'},byId.get(ready.id))}
+  const waiting=new Set(rl.map(r=>r.id));
+  const dueAll=cards.filter(c=>{const s=store.cards[c.id];return s&&s.due<=now&&!waiting.has(c.id)}).sort((a,b)=>store.cards[a.id].due-store.cards[b.id].due);
+  let due=dueAll.filter(c=>c.id!==lastId);if(!due.length)due=dueAll;
+  if(due.length)return Object.assign({kind:'review'},pickR(due.slice(0,4)));
+  if(newDone()<newLimit()){
+    const fresh=cards.filter(c=>!store.cards[c.id]&&!waiting.has(c.id));
+    if(fresh.length){const gi=new Map(deckGroups(qTopic.value).map(g=>g.parent).sort((a,b)=>(hash(a)>>>0)%10007-(hash(b)>>>0)%10007).map((p,i)=>[p,i]));
+      fresh.sort((a,b)=>newKey(a,gi)-newKey(b,gi));return Object.assign({kind:'new'},fresh[0])}}
+  if(rl.length){const r=rl.slice().sort((a,b)=>a.wait-b.wait).find(r=>r.id!==lastId)||rl[0];relearn=relearn.filter(x=>x!==r);return Object.assign({kind:'again'},byId.get(r.id))}
+  return null}
+function practiceCard(){const cards=deckCards();if(!cards.length)return null;
+  const seen=cards.filter(c=>store.cards[c.id]&&c.id!==lastId).sort((a,b)=>(store.cards[b.id].lapses-store.cards[a.id].lapses)||(store.cards[a.id].ease-store.cards[b.id].ease));
+  const src=seen.length?seen.slice(0,15):cards.filter(c=>c.id!==lastId);return Object.assign({kind:'practice'},pickR(src.length?src:cards))}
+function stats(){const cards=deckCards(),now=Date.now(),waiting=new Set(relearn.map(r=>r.id));let due=0,learned=0,mastered=0,unseen=0;
+  for(const c of cards){const s=store.cards[c.id];if(!s){unseen++;continue}if(s.due<=now||waiting.has(c.id))due++;if(s.reps>0)learned++;if(s.reps>0&&s.int>=21)mastered++}
+  return {total:cards.length,due,learned,mastered,started:cards.length-unseen,unseen,newLeft:Math.max(0,Math.min(unseen,newLimit()-newDone()))}}
+const when=d=>d<=1?'tomorrow':d<14?`in ${d} days`:d<60?`in about ${Math.round(d/7)} weeks`:`in about ${Math.round(d/30)} months`;
+// Scheduling (simplified SM-2): right answers wait 1 day, then 3 days, then about 2.5x longer each time; a miss comes back 3 questions later and starts over.
+function grade(c,ok){
+  relearn.forEach(r=>r.wait--);lastId=c.id;
+  if(practice||c.kind==='practice')return 'Practice question, so your review schedule did not change.';
+  rollDay();
+  let s=store.cards[c.id];if(!s){s=store.cards[c.id]={reps:0,int:0,ease:2.5,lapses:0,due:0};const t=c.id.split('|')[0];store.newBy[t]=(store.newBy[t]||0)+1}
+  if(ok){s.reps++;s.int=s.reps===1?1:s.reps===2?3:Math.min(180,Math.round(s.int*s.ease));s.due=dayStart()+s.int*DAY;save();return `Next review ${when(s.int)}.`}
+  s.lapses++;s.reps=0;s.int=0;s.ease=Math.max(1.3,Math.round((s.ease-.2)*100)/100);s.due=Date.now();relearn.push({id:c.id,wait:3});save();
+  return 'This one will come back in a few questions.'}
+function renderSRS(){
+  const st=stats(),topicW=qTopic.value==='mus'?'muscles':'bones';
+  qBar.innerHTML=`<span class="tag due">${st.due} due now</span><span class="tag new">${st.newLeft} new left today</span>`+
+    (practice?`<span class="tag">Practice</span><button class="linkbtn" id="stopPrac">Back to scheduled reviews</button>`:'');
+  const pm=st.total?st.mastered/st.total*100:0,pl=st.total?(st.learned-st.mastered)/st.total*100:0;
+  const lap={};for(const c of deckCards()){const s=store.cards[c.id];if(s&&s.lapses){const k=c.g.cat+'|'+c.g.parent;lap[k]=(lap[k]||0)+s.lapses}}
+  const trouble=Object.entries(lap).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  prog.innerHTML=`<div class="eyebrow">Your progress · ${topicW}, ${qDeck.value==='core'?'core list':'everything'}${qType.value==='mix'?'':', '+TYPES[qTopic.value].find(x=>x[0]===qType.value)[1].toLowerCase()}</div>
+    <div class="pbar" role="img" aria-label="${st.mastered} mastered, ${st.learned-st.mastered} learning, ${st.total-st.learned} not learned yet, out of ${st.total} cards"><i class="m" style="width:${pm}%"></i><i class="l" style="width:${pl}%"></i></div>
+    <div class="stats">
+      <div class="stat"><b>${st.mastered}</b><span><i style="background:var(--accent)"></i>Mastered</span></div>
+      <div class="stat"><b>${st.learned-st.mastered}</b><span><i style="background:color-mix(in srgb,var(--accent) 38%,var(--paper))"></i>Learning</span></div>
+      <div class="stat"><b>${st.total-st.learned}</b><span><i style="background:var(--bg);border:1px solid var(--line)"></i>Not learned yet</span></div>
+    </div>
+    ${trouble.length?`<div class="sub2">Trouble spots · tap to study</div><div class="chips">${trouble.map(([k,n])=>`<button class="chip" data-k="${k}">${gName(groups[k])}<small>missed ${n}×</small></button>`).join('')}</div>`:''}
+    <div class="setrow"><label for="qNew">New cards per day (muscles and bones each)</label><select id="qNew">${[10,20,30,50].map(n=>`<option value="${n}"${n===store.settings.newPerDay?' selected':''}>${n}</option>`).join('')}</select></div>
+    <p class="note">Each ${topicW==='muscles'?'muscle':'bone'} has a separate card for each question type, ${st.total} cards in this set. Mastered means answered right several times in a row, so it won't come back for 3 weeks or more. ${canSave?'Progress is saved in this browser on this device.':'<b>This browser is blocking storage (for example a private window), so progress will reset when the page closes.</b>'}</p>
+    ${confirmReset?`<div class="confirm"><span>Erase all quiz progress (muscles and bones) on this device?</span><button class="btn danger" id="rsYes">Erase progress</button><button class="btn" id="rsNo">Cancel</button></div>`:`<div class="row"><button class="btn" id="rsAsk">Reset progress</button></div>`}`;
+}
+qBar.addEventListener('click',e=>{if(e.target.id==='stopPrac'){practice=false;newQ()}});
+prog.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.k){const g=groups[b.dataset.k];setMode('study');if(!layerOn[g.cat]){layerOn[g.cat]=true;$('L-'+g.cat).checked=true}g.meshes.forEach(m=>hidden.delete(m));applyVis();showPart(g.meshes[0],false);select(g.meshes);focus(g.meshes);renderList();return}
+  if(b.id==='rsAsk'){confirmReset=true;renderSRS()}
+  if(b.id==='rsNo'){confirmReset=false;renderSRS()}
+  if(b.id==='rsYes'){store.cards={};store.newBy={};store.extraBy={};relearn=[];lastId=null;confirmReset=false;practice=false;save();newQ()}});
+prog.addEventListener('change',e=>{if(e.target.id==='qNew'){store.settings.newPerDay=+e.target.value;save();if(!quiz||quiz.done)newQ();else renderSRS()}});
+qTopic.onchange=()=>{fillTypes();practice=false;newQ()};qType.onchange=()=>{practice=false;newQ()};
+qDeck.onchange=()=>{store.settings.deck=qDeck.value;save();practice=false;newQ()};
 function setMode(m){mode=m;$('mStudy').setAttribute('aria-pressed',m==='study');$('mQuiz').setAttribute('aria-pressed',m==='quiz');$('study').hidden=m!=='study';$('quiz').hidden=m!=='quiz';
-  quizDim=null;quizMarks=null;select([]);if(m==='quiz'){fillTypes();newQ()}else{applyVis();idle();home()}}
+  quizDim=null;quizMarks=null;select([]);if(m==='quiz'){if(!qType.options.length)fillTypes();practice=false;newQ()}else{applyVis();idle();home()}}
 $('mStudy').onclick=()=>setMode('study');$('mQuiz').onclick=()=>setMode('quiz');
+function caughtUp(){
+  const st=stats(),cards=deckCards(),now=Date.now();let next=Infinity;
+  for(const c of cards){const s=store.cards[c.id];if(s&&s.due>now)next=Math.min(next,s.due)}
+  quiz=null;quizDim=null;quizMarks=null;select([]);applyVis();home();
+  const nextTxt=next<Infinity?`Your next reviews are due ${when(Math.max(1,Math.round((next-dayStart())/DAY)))}.`:'';
+  const lead=st.unseen?`You've done today's new cards and every review that's due. ${nextTxt}`:`You've started every card in this set. ${nextTxt}`;
+  qBody.innerHTML=`<p class="prompt">All caught up.</p><p class="note">${lead}</p><div class="row">${st.unseen?'<button class="btn" id="more">Learn 10 more new cards</button>':''}${st.total?'<button class="btn" id="prac">Keep practising</button>':''}</div>
+    <p class="note">Practice picks the cards you've missed most and doesn't change your schedule.</p>`;
+  const mo=$('more');if(mo)mo.onclick=()=>{const t=qTopic.value;store.extraBy[t]=(store.extraBy[t]||0)+10;save();newQ()};
+  const pr=$('prac');if(pr)pr.onclick=()=>{practice=true;newQ()};
+}
 function newQ(){
-  const topic=qTopic.value;let type=qType.value;if(type==='mix')type=pickR(TYPES[topic].slice(1).map(x=>x[0]));
-  const P=pool(topic);let g;do{g=pickR(P)}while(quiz&&quiz.g===g&&P.length>1);
-  // show only one side of paired structures for the question
+  confirmReset=false;
+  const topic=qTopic.value,c=practice?practiceCard():nextCard();
+  if(!c){caughtUp();renderSRS();return}
+  const g=c.g,type=c.type;
   const side=pickR(['left','right']);const target=g.meshes.filter(m=>!m.userData.side||m.userData.side===side);
-  quiz={g,type,topic,target,done:false};quizMarks=null;hidden.clear();layerOn.bone=true;layerOn.mus=topic==='mus';for(const c in layerOn)$('L-'+c).checked=layerOn[c];
+  quiz={card:c,g,type,topic,target,done:false};quizMarks=null;hidden.clear();layerOn.bone=true;layerOn.mus=topic==='mus';for(const k in layerOn)$('L-'+k).checked=layerOn[k];
+  const tag=`<span class="tag ${c.kind==='new'?'new':c.kind==='again'?'again':''}">${{new:'New card',review:'Review',again:'Try again',practice:'Practice'}[c.kind]}</span>`;
   if(type==='find'){quizDim=null;select([]);applyVis();home();
-    qBody.innerHTML=`<p class="prompt">Tap the <em>${gName(g)}</em> on the model.</p><p class="note">Either side counts. Rotate the model if you need to; deep muscles may need "See-through muscles" or "Hide selected".</p><div id="fb"></div>`;return}
+    qBody.innerHTML=`<p class="prompt">${tag}<br>Tap the <em>${gName(g)}</em> on the model.</p><p class="note">Either side counts. Rotate the model if you need to; deep muscles may need "See-through muscles" or "Hide selected".</p><div id="fb"></div>`;renderSRS();return}
   quizDim=new Set(target);applyVis();select(target);focus(target);
   const f=topic==='mus'?MF[g.parent]:bfact(g.parent);
   let right,q,field;
   if(type==='name'){right=gName(g);q=`Which ${topic==='mus'?'muscle':'bone'} is highlighted?`}
   else{field={o:1,i:2,a:3,p:3}[type];right=f[field];q=`What is the ${{o:'origin',i:'insertion',a:'action',p:'purpose'}[type]} of the <em>${gName(g)}</em>?`}
-  const opts=[right];for(const x of shuf(P)){if(opts.length>=4)break;const v=type==='name'?gName(x):(topic==='mus'?MF[x.parent]:bfact(x.parent))[field];if(!opts.includes(v))opts.push(v)}
+  // distractors: same body region first, from the same set when it is big enough
+  const D=deckGroups(topic),src=D.length>=8?D:pool(topic);
+  const same=shuf(src.filter(x=>x!==g&&regionOf(x)===regionOf(g))),other=shuf(src.filter(x=>x!==g&&regionOf(x)!==regionOf(g)));
+  const opts=[right];for(const x of [...same.slice(0,6),...other,...same.slice(6)]){if(opts.length>=4)break;const v=type==='name'?gName(x):(topic==='mus'?MF[x.parent]:bfact(x.parent))[field];if(v&&!opts.includes(v))opts.push(v)}
   quiz.right=right;
-  qBody.innerHTML=`<p class="prompt">${q}</p><div class="choices">${shuf(opts).map(o=>`<button>${o}</button>`).join('')}</div><div id="fb"></div>`;
+  qBody.innerHTML=`<p class="prompt">${tag}<br>${q}</p><div class="choices">${shuf(opts).map((o,i)=>`<button data-n="${i+1}">${o}</button>`).join('')}</div><p class="kbd">Keys 1–4 pick an answer · Enter for next</p><div id="fb"></div>`;
   qBody.querySelectorAll('.choices button').forEach(b=>b.onclick=()=>answer(b));
+  renderSRS();
 }
 function explain(g){const f=g.cat==='mus'?MF[g.parent]:bfact(g.parent);return g.cat==='mus'?`<div class="fb"><b>${gName(g)}</b> · Origin: ${f[1]}. Insertion: ${f[2]}. Action: ${f[3]}.</div>`:`<div class="fb"><b>${gName(g)}</b> · ${f[2]}. ${f[3]}.</div>`}
-function finish(ok){score.t++;if(ok)score.r++;$('score').textContent=`${score.r} / ${score.t}`;quiz.done=true;
-  $('fb').innerHTML=`<div class="fb"><b class="${ok?'ok':'no'}">${ok?'Correct.':'Not quite.'}</b></div>`+explain(quiz.g)+`<button class="primary" id="next">Next question</button>`;$('next').onclick=newQ;$('next').focus()}
-function answer(b){if(quiz.done)return;qBody.querySelectorAll('.choices button').forEach(x=>{x.disabled=true;if(x.textContent===quiz.right)x.classList.add('right')});const ok=b.textContent===quiz.right;if(!ok)b.classList.add('wrong');finish(ok)}
+function finish(ok){score.t++;if(ok)score.r++;$('score').textContent=`${score.r} of ${score.t} right this session`;quiz.done=true;const msg=grade(quiz.card,ok);
+  $('fb').innerHTML=`<div class="fb"><b class="${ok?'ok':'no'}">${ok?'Correct.':'Not quite.'}</b> <span class="nextline">${msg}</span></div>`+explain(quiz.g)+`<button class="primary" id="next">Next question</button>`;$('next').onclick=newQ;$('next').focus();renderSRS()}
+function answer(b){if(!quiz||quiz.done)return;qBody.querySelectorAll('.choices button').forEach(x=>{x.disabled=true;if(x.textContent===quiz.right)x.classList.add('right')});const ok=b.textContent===quiz.right;if(!ok)b.classList.add('wrong');finish(ok)}
 function quizClick(m){if(!quiz||quiz.type!=='find'||quiz.done)return;const ok=quiz.g.meshes.includes(m);
   quizMarks=new Map();if(!ok)byKey[m.userData.key].forEach(x=>quizMarks.set(x,0xb03a3a));quiz.g.meshes.forEach(x=>quizMarks.set(x,0x2f9d5f));paint();focus(quiz.g.meshes);finish(ok)}
+document.addEventListener('keydown',e=>{if(mode!=='quiz'||!quiz||quiz.done||/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))return;
+  const b=qBody.querySelector(`.choices button[data-n="${e.key}"]`);if(b){e.preventDefault();answer(b)}});
 
 // ---------- loop ----------
 applyVis();
 renderer.setAnimationLoop(now=>{if(anim)anim(now);controls.update();renderer.render(scene,camera)});
-window.__atlas={meshes,groups,camera,controls,flyTo,select,showPart};
+window.__atlas={meshes,groups,camera,controls,flyTo,select,showPart,srs:()=>store,stats:()=>stats()};
 })();
 </script>
 
