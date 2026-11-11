@@ -345,11 +345,11 @@ function showPart(m,fly){
     const at=ATTX[u.parent]||{o:[],i:[]};
     const chips=[...at.o.map(t=>[t,'origin']),...at.i.map(t=>[t,'insertion'])].map(([t,r])=>`<button class="chip" data-tok="${t}" data-side="${u.side}">${window.ATT.label(t)}<small>${r}</small></button>`).join('');
     info.innerHTML=`<div class="eyebrow">${f?f[0]:'Muscle'}${u.side?' · '+u.side+' side':''}</div><h2>${cap(u.parent)}</h2>
-      ${u.base!==u.parent?`<p class="part">Part tapped: ${u.base}</p>`:'<p class="part"></p>'}${ex?'<span class="badge">Matches your PHED 348 slides</span>':''}
+      ${u.base!==u.parent?`<p class="part">Part tapped: ${u.base}</p>`:'<p class="part"></p>'}${ex?'<span class="badge">Wording from your PHED 348 slides</span>':''}
       ${f?`<dl><div><dt>Origin</dt><dd>${f[1]}</dd></div><div><dt>Insertion</dt><dd>${f[2]}</dd></div><div><dt>Action</dt><dd>${f[3]}</dd></div>
       ${ex&&ex.g?`<div><dt>Group</dt><dd>${ex.g}</dd></div>`:''}${ex&&ex.s?`<div><dt>Moves the scapula</dt><dd>${ex.s}</dd></div>`:''}
       ${chips?`<div><dt>Bones it attaches to</dt><dd class="chips">${chips}</dd></div>`:'<div><dt>Bones it attaches to</dt><dd>None: this muscle attaches to skin, fascia or other muscles.</dd></div>'}</dl>`:'<p class="empty">Origin and insertion for this small muscle are not in this guide.</p>'}
-      ${ex&&ex.n?`<p class="slidenote"><b>Slide check:</b> ${ex.n}</p>`:''}
+      ${ex&&ex.n?`<p class="slidenote"><b>Textbook note:</b> ${ex.n}</p>`:''}
       <p class="note">Tip: use "Hide selected" to peel this muscle away and see what lies underneath.</p>`;
   }else{
     select([m]);const f=bfact(u.base)||[0,u.cat==='cart'?'Cartilage':u.cat==='tend'?'Tendon or ligament':'Bone','',''];

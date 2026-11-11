@@ -44,7 +44,7 @@ Then open http://localhost:8000 (or the address `serve` prints) in your browser.
 | --- | --- |
 | `index.html` | The 3D atlas (viewer, study panel, quiz) |
 | `flat.html` | The simpler 2D study plates |
-| `data/facts.js` | Study facts (muscles on the PHED 348 shoulder, elbow and wrist/hand slides use the slides' wording, with notes where a slide has an error): origin, insertion and action for each muscle (MFACTS), the exact bones each muscle starts and ends on (MATT), and location, purpose and length for each bone (BFACTS). Edit this to match her textbook. |
+| `data/facts.js` | Study facts (muscles on the PHED 348 shoulder, elbow and wrist/hand slides use the slides' exact wording, with a textbook note where textbooks differ): origin, insertion and action for each muscle (MFACTS), the exact bones each muscle starts and ends on (MATT), and location, purpose and length for each bone (BFACTS). Edit this to match her textbook. |
 | `data/manifest.json` | List of every 3D part and where its shape is stored |
 | `data/*.bin` | Compressed 3D shapes for bones, muscles, cartilage and tendons |
 | `vendor/` | three.js r147 (3D library), so the page works offline |
