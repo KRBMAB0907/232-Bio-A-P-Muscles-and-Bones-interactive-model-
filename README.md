@@ -1,6 +1,6 @@
 # Muscle Atlas
 
-A rotatable 3D model of the human bones and muscles for studying BIOL 232 (Human Anatomy and Physiology I) at Eastern Washington University. Tap any bone or muscle to see what it is, its origin, insertion and action, and which bones and muscles it connects to. Quiz mode tests names, spelling, locations, origins, insertions, actions and bone purposes, using spaced repetition: missed cards come back a few questions later, and correct ones come back after longer and longer gaps (1 day, 3 days, then about 2.5 times longer each time). Progress is saved in the browser (localStorage) on that device.
+A rotatable 3D model of the human bones and muscles for studying BIOL 232 (Human Anatomy and Physiology I) and PHED 348 at Eastern Washington University. Tap any bone or muscle to see what it is, its origin, insertion and action, and which bones and muscles it connects to. Quiz mode tests names, spelling, locations, origins, insertions, actions and bone purposes, using spaced repetition: missed cards come back a few questions later, and correct ones come back after longer and longer gaps (1 day, 3 days, then about 2.5 times longer each time). Progress is saved in the browser (localStorage) on that device.
 
 To run model click link: 
  https://krbmab0907.github.io/232-Bio-A-P-Muscles-and-Bones-interactive-model-/
@@ -44,7 +44,7 @@ Then open http://localhost:8000 (or the address `serve` prints) in your browser.
 | --- | --- |
 | `index.html` | The 3D atlas (viewer, study panel, quiz) |
 | `flat.html` | The simpler 2D study plates |
-| `data/facts.js` | Study facts: origin, insertion and action for each muscle (MFACTS), the exact bones each muscle starts and ends on (MATT), and location, purpose and length for each bone (BFACTS). Edit this to match her textbook. |
+| `data/facts.js` | Study facts (muscles on the PHED 348 shoulder, elbow and wrist/hand slides use the slides' wording, with notes where a slide has an error): origin, insertion and action for each muscle (MFACTS), the exact bones each muscle starts and ends on (MATT), and location, purpose and length for each bone (BFACTS). Edit this to match her textbook. |
 | `data/manifest.json` | List of every 3D part and where its shape is stored |
 | `data/*.bin` | Compressed 3D shapes for bones, muscles, cartilage and tendons |
 | `vendor/` | three.js r147 (3D library), so the page works offline |
