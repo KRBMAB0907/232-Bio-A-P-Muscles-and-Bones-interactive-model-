@@ -177,7 +177,7 @@ select{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background
             <div class="qsel">
               <select id="qTopic" aria-label="Quiz topic"><option value="mus">Muscles</option><option value="bone">Bones</option></select>
               <select id="qType" aria-label="Question type"></select>
-              <select id="qDeck" aria-label="Which set"><option value="core">Core list (BIOL 232)</option><option value="phed">PHED 348 slides (shoulder to hand)</option><option value="all">Everything in the model</option></select>
+              <select id="qDeck" aria-label="Which set"><option value="core">Core list (BIOL 232)</option><option value="phed">PHED 348: shoulder to hand</option><option value="phed2">PHED 348: spine, hip, knee, ankle and foot</option><option value="all">Everything in the model</option></select>
             </div>
             <span class="score" id="score">0 of 0 right this session</span>
           </div>
@@ -345,22 +345,24 @@ function showPart(m,fly){
     const at=ATTX[u.parent]||{o:[],i:[]};
     const chips=[...at.o.map(t=>[t,'origin']),...at.i.map(t=>[t,'insertion'])].map(([t,r])=>`<button class="chip" data-tok="${t}" data-side="${u.side}">${window.ATT.label(t)}<small>${r}</small></button>`).join('');
     info.innerHTML=`<div class="eyebrow">${f?f[0]:'Muscle'}${u.side?' · '+u.side+' side':''}</div><h2>${cap(u.parent)}</h2>
-      ${u.base!==u.parent?`<p class="part">Part tapped: ${u.base}</p>`:'<p class="part"></p>'}${ex?'<span class="badge">Wording from your PHED 348 slides</span>':''}
+      ${u.base!==u.parent?`<p class="part">Part tapped: ${u.base}</p>`:'<p class="part"></p>'}${ex&&ex.w?'<span class="badge">Wording from your PHED 348 slides</span>':''}
       ${f?`<dl><div><dt>Origin</dt><dd>${f[1]}</dd></div><div><dt>Insertion</dt><dd>${f[2]}</dd></div><div><dt>Action</dt><dd>${f[3]}</dd></div>
       ${ex&&ex.g?`<div><dt>Group</dt><dd>${ex.g}</dd></div>`:''}${ex&&ex.s?`<div><dt>Moves the scapula</dt><dd>${ex.s}</dd></div>`:''}
       ${chips?`<div><dt>Bones it attaches to</dt><dd class="chips">${chips}</dd></div>`:'<div><dt>Bones it attaches to</dt><dd>None: this muscle attaches to skin, fascia or other muscles.</dd></div>'}</dl>`:'<p class="empty">Origin and insertion for this small muscle are not in this guide.</p>'}
       ${ex&&ex.n?`<p class="slidenote"><b>Textbook note:</b> ${ex.n}</p>`:''}
       <p class="note">Tip: use "Hide selected" to peel this muscle away and see what lies underneath.</p>`;
   }else{
-    select([m]);const f=bfact(u.base)||[0,u.cat==='cart'?'Cartilage':u.cat==='tend'?'Tendon or ligament':'Bone','',''];
+    select([m]);const f=(u.cat==='bone'&&bfact(u.base))||[0,u.cat==='cart'?(/disk/.test(u.base)?'Intervertebral disc':'Cartilage'):u.cat==='tend'?'Tendon or ligament':'Bone','',''];
     const mus=u.cat==='bone'?musclesForBone(u.base):{o:[],i:[]};
     const bl=u.cat==='bone'?(window.BLAND||[]).filter(x=>x[0].test(u.base)):[],land=(bl.find(x=>x[1])||[])[1]||'',bx=bl.map(x=>x[2]).filter(Boolean).join(' ');
     const mc=ns=>ns.map(n=>`<button class="chip" data-mus="${n}" data-side="${u.side}">${cap(n)}</button>`).join('');
     let extra='';
     if(u.cat==='cart')extra=/disk/.test(u.base)?'Cushions the vertebrae and lets the spine bend.':'Joins a rib to the sternum and lets the chest expand.';
     if(u.cat==='tend')extra=/calcaneal/.test(u.base)?'Achilles tendon: joins gastrocnemius and soleus to the heel.':/linea alba/.test(u.base)?'Midline band where the abdominal muscle sheets meet.':/inguinal/.test(u.base)?'Runs from the anterior superior iliac spine to the pubic tubercle.':/interosseous membrane/.test(u.base)?'Sheet joining the two forearm or leg bones; muscles start on it.':'';
-    info.innerHTML=`<div class="eyebrow">${f[1]}${u.side?' · '+u.side+' side':''}</div><h2>${prettyBone(u.base)}</h2><p class="part"></p>${bl.length?'<span class="badge">Includes your PHED 348 slides</span>':''}
-      <dl>${f[2]?`<div><dt>Where it is</dt><dd>${f[2]}</dd></div>`:''}${f[3]?`<div><dt>Purpose</dt><dd>${f[3]}</dd></div>`:''}${extra?`<div><dt>About</dt><dd>${extra}</dd></div>`:''}${f[4]?`<div><dt>Approx. adult length</dt><dd>${f[4]}</dd></div>`:''}${land?`<div><dt>Landmarks</dt><dd>${land}</dd></div>`:''}${bx?`<div><dt>From your slides</dt><dd>${bx}</dd></div>`:''}
+    const tf=u.cat!=='bone'?((window.TFACTS||[]).find(x=>x[0].test(u.base))||[])[1]:'';
+    if(tf)extra='';
+    info.innerHTML=`<div class="eyebrow">${f[1]}${u.side?' · '+u.side+' side':''}</div><h2>${prettyBone(u.base)}</h2><p class="part"></p>${bl.length||tf?'<span class="badge">Includes your PHED 348 slides</span>':''}
+      <dl>${f[2]?`<div><dt>Where it is</dt><dd>${f[2]}</dd></div>`:''}${f[3]?`<div><dt>Purpose</dt><dd>${f[3]}</dd></div>`:''}${extra?`<div><dt>About</dt><dd>${extra}</dd></div>`:''}${f[4]?`<div><dt>Approx. adult length</dt><dd>${f[4]}</dd></div>`:''}${land?`<div><dt>Landmarks</dt><dd>${land}</dd></div>`:''}${tf?`<div><dt>From your slides</dt><dd>${tf}</dd></div>`:''}${bx?`<div><dt>From your slides</dt><dd>${bx}</dd></div>`:''}
       ${mus.o.length?`<div><dt>Muscles that start here (origin)</dt><dd class="chips">${mc(mus.o)}</dd></div>`:''}
       ${mus.i.length?`<div><dt>Muscles that attach here (insertion)</dt><dd class="chips">${mc(mus.i)}</dd></div>`:''}</dl>`;
   }
@@ -380,8 +382,8 @@ function renderList(){
   const q=search.value.trim().toLowerCase(),out={};
   const src=Object.entries(groups).filter(([k,g])=>listCat==='mus'?g.cat==='mus':g.cat!=='mus');
   for(const [k,g] of src){const nm=g.cat==='mus'?cap(g.parent):prettyBone(g.parent),f=g.cat==='mus'?MF[g.parent]:bfact(g.parent);
-    const ex=g.cat==='mus'?(window.MEXTRA||{})[g.parent]:null,bl=g.cat==='bone'?(window.BLAND||[]).filter(x=>x[0].test(g.parent)).map(x=>x[1]+' '+x[2]).join(' '):'';
-    const hay=(nm+' '+(f?f.slice(1).join(' '):'')+' '+g.parent+' '+(ex?ex.g+' '+ex.s+(ex.g?' phed 348':''):'')+' '+bl).toLowerCase();if(q&&!hay.includes(q))continue;(out[regionOf(g)]=out[regionOf(g)]||[]).push([k,nm,g])}
+    const ex=g.cat==='mus'?(window.MEXTRA||{})[g.parent]:null,tfx=g.cat!=='mus'&&g.cat!=='bone'?((window.TFACTS||[]).find(x=>x[0].test(g.parent))||[])[1]||'':'',bl=g.cat==='bone'?(window.BLAND||[]).filter(x=>x[0].test(g.parent)).map(x=>x[1]+' '+x[2]).join(' '):'';
+    const hay=(nm+' '+(f?f.slice(1).join(' '):'')+' '+g.parent+' '+(ex?ex.g+' '+ex.s+(ex.g?' phed 348':''):'')+' '+bl+' '+tfx).toLowerCase();if(q&&!hay.includes(q))continue;(out[regionOf(g)]=out[regionOf(g)]||[]).push([k,nm,g])}
   const selKeys=new Set(sel.map(m=>m.userData.cat+'|'+m.userData.parent));
   listEl.innerHTML=Object.keys(out).length?Object.entries(out).sort((a,b)=>rIdx(a[0])-rIdx(b[0])).map(([r,xs])=>`<h3>${r}</h3>`+xs.sort((a,b)=>a[1].localeCompare(b[1],undefined,{numeric:true})).map(([k,nm])=>`<button data-k="${k}" class="${selKeys.has(k)?'on':''}">${nm}</button>`).join('')).join(''):'<p class="empty" style="padding:10px 4px">Nothing matches that search.</p>';
 }
@@ -419,7 +421,7 @@ function rollDay(){const k=dayKey();if(store.day!==k){store.day=k;store.newBy={}
 rollDay();
 // New cards per day are counted separately for muscles and for bones.
 const newDone=()=>store.newBy[qTopic.value]||0,newLimit=()=>store.settings.newPerDay+(store.extraBy[qTopic.value]||0);
-qDeck.value=['all','phed'].includes(store.settings.deck)?store.settings.deck:'core';
+qDeck.value=['all','phed','phed2'].includes(store.settings.deck)?store.settings.deck:'core';
 
 // The core list: the muscles in the BIOL 232 study guide, and the named bones (not every rib, vertebra, digit bone or tooth).
 const CORE_M=new Set(['frontalis','temporalis','orbicularis oculi','zygomaticus major','masseter','orbicularis oris','buccinator','sternocleidomastoid','platysma','splenius capitis',
@@ -433,7 +435,14 @@ const CORE_M=new Set(['frontalis','temporalis','orbicularis oculi','zygomaticus 
 const coreBone=p=>!/tooth|phalanx|\brib$|metacarpal|metatarsal|vertebra|sesamoid/.test(p);
 // PHED 348 set: the muscles and bones on the shoulder, elbow and wrist/hand slides.
 const PHED_B=/^(clavicle|scapula|humerus|radius|ulna|scaphoid|lunate|triquetral|pisiform|trapezium|trapezoid|capitate|hamate)$|metacarpal|phalanx of (thumb|index|middle finger|ring finger|little finger)/;
-function deckGroups(topic){const d=qDeck.value;return pool(topic).filter(g=>d==='all'||(d==='phed'?(topic==='mus'?!!(window.MEXTRA||{})[g.parent]:PHED_B.test(g.parent)):(topic==='mus'?CORE_M.has(g.parent):coreBone(g.parent))))}
+// PHED 348 lower body set: spine, hip and pelvis, knee, lower leg, ankle and foot.
+const PHED2_B=/vertebra$|^(atlas|axis|sacrum|hip bone|femur|patella|tibia|fibula|talus|calcaneus|navicular bone of foot|cuboid bone|medial cuneiform bone|intermediate cuneiform bone|lateral cuneiform bone)$|metatarsal|phalanx of .*toe/;
+const inSet=(p,set)=>(((window.MEXTRA||{})[p]||{}).d||[]).includes(set);
+function deckGroups(topic){const d=qDeck.value;return pool(topic).filter(g=>{
+  if(d==='all')return true;
+  if(d==='phed')return topic==='mus'?inSet(g.parent,'upper'):PHED_B.test(g.parent);
+  if(d==='phed2')return topic==='mus'?inSet(g.parent,'lower'):PHED2_B.test(g.parent);
+  return topic==='mus'?CORE_M.has(g.parent):coreBone(g.parent)})}
 function deckCards(){const topic=qTopic.value,ts=qType.value==='mix'?TYPES[topic].slice(1).map(x=>x[0]):[qType.value],out=[];
   for(const g of deckGroups(topic))for(const t of ts)out.push({id:topic+'|'+g.parent+'|'+t,g,type:t});return out}
 // New cards: learn to recognise a structure first (name, find), then its details a few structures later.
@@ -478,7 +487,7 @@ function renderSRS(){
   const pm=st.total?st.mastered/st.total*100:0,pl=st.total?(st.learned-st.mastered)/st.total*100:0;
   const lap={};for(const c of deckCards()){const s=store.cards[c.id];if(s&&s.lapses){const k=c.g.cat+'|'+c.g.parent;lap[k]=(lap[k]||0)+s.lapses}}
   const trouble=Object.entries(lap).sort((a,b)=>b[1]-a[1]).slice(0,6);
-  prog.innerHTML=`<div class="eyebrow">Your progress · ${topicW}, ${{core:'core list',phed:'PHED 348 slides',all:'everything'}[qDeck.value]}${qType.value==='mix'?'':', '+TYPES[qTopic.value].find(x=>x[0]===qType.value)[1].toLowerCase()}</div>
+  prog.innerHTML=`<div class="eyebrow">Your progress · ${topicW}, ${{core:'core list',phed:'PHED 348 shoulder to hand',phed2:'PHED 348 spine to foot',all:'everything'}[qDeck.value]}${qType.value==='mix'?'':', '+TYPES[qTopic.value].find(x=>x[0]===qType.value)[1].toLowerCase()}</div>
     <div class="pbar" role="img" aria-label="${st.mastered} mastered, ${st.learned-st.mastered} learning, ${st.total-st.learned} not learned yet, out of ${st.total} cards"><i class="m" style="width:${pm}%"></i><i class="l" style="width:${pl}%"></i></div>
     <div class="stats">
       <div class="stat"><b>${st.mastered}</b><span><i style="background:var(--accent)"></i>Mastered</span></div>
